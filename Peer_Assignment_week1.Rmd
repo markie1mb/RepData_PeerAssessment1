@@ -1,0 +1,244 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+
+---
+
+This assignment makes use of data from a personal activity monitoring
+device. This device collects data at 5 minute intervals through out the
+day. The data consists of two months of data from an anonymous
+individual collected during the months of October and November, 2012
+and include the number of steps taken in 5 minute intervals each day.
+
+### Data
+
+The data for this assignment can be downloaded from the course web
+site:
+
+* Dataset: [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) [52K]
+
+The variables included in this dataset are:
+
+* **steps**: Number of steps taking in a 5-minute interval (missing
+    values are coded as `NA`)
+
+* **date**: The date on which the measurement was taken in YYYY-MM-DD
+    format
+
+* **interval**: Identifier for the 5-minute interval in which
+    measurement was taken
+
+
+
+## Loading and preprocessing the data
+
+Before loading the data you have to set your working directory (In R) to the directory
+wich contains activity.csv
+.e.g. setwd("C:/Users/Marc/Documents/R_Working_dir")
+
+The data is being read into df_activity which wil be the dataframe for the first part of this assignment
+
+```{r, echo = TRUE}
+df_activity<-read.csv("activity.csv")
+df_activity$interval<- as.factor(df_activity$interval)
+df_activity$date<-as.Date(df_activity$date)
+```
+
+### prerequisites
+
+For this assignment libraries dplyr and ggplot2 must be loaded.
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+
+
+## What is mean total number of steps taken per day?
+
+To get an idea of the number of steps made on average per day, 
+we make a histogram in which the number of steps is plotted against the number of days
+
+```{r, echo = TRUE}
+
+Activity_na<-is.na(df_activity[,1])
+
+groupbyDate <-  df_activity[!Activity_na,]   %>% 
+    group_by(date) %>% 
+    summarise(daily_steps=sum(steps))
+
+groupbyDate$daily_steps<-unlist(groupbyDate$daily_steps)
+
+ggplot()+aes(groupbyDate$daily_steps) + 
+    geom_histogram(col="black", 
+                   fill="green", 
+                   alpha = .2,
+                   bins=10) + 
+    labs(title="Number of steps per day") +
+    labs(x="Number of steps", y="Number of days") +
+    geom_vline(aes(xintercept=mean(groupbyDate$daily_steps)),color="red", linetype="dashed", size=1)+
+    scale_x_continuous(breaks = c(0,5000,10000,15000,20000,25000))+
+    scale_y_continuous(breaks = c(0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30))
+```
+
+### Extra Barplot
+
+because I felt that the histogram did not give the correct insight, I made a barplot which does give the picture I was looking for
+```{r, echo = TRUE}
+ggplot(groupbyDate)+aes(x=date,y=daily_steps) + 
+    geom_bar(col="black", 
+                   fill="green", 
+                   alpha = .2,
+             stat="identity") + 
+    labs(title="Number of steps per day") +
+    labs(x="Days", y="Number of Steps")+
+    geom_hline(aes(yintercept=mean(groupbyDate$daily_steps)),color="red", linetype="dashed", size=1)
+
+```
+
+
+The Mean and median:
+
+```{r}
+mean(groupbyDate$daily_steps)
+median(groupbyDate$daily_steps)
+```
+
+
+
+## What is the average daily activity pattern?
+
+Here we look at how the distribution of the number of steps throughout the day. 
+The day will be divided into 288 blocks of 5 minutes.
+NA reccords wil be omitted.
+
+```{r, echo = TRUE}
+groupbyTime <-  df_activity[!Activity_na,]   %>% 
+    group_by(interval) %>% 
+    summarise(interval_steps=mean(steps))
+
+groupbyTime$interval_steps<-unlist(groupbyTime$interval_steps)
+groupbyTime$interval_num<-as.numeric(groupbyTime$interval)
+
+ggplot()+aes(groupbyTime$interval_num,groupbyTime$interval_steps) + 
+    geom_line(col="black") + 
+    labs(title="Average number of steps per 5 minute interval") +
+    labs(x="Intervals", y="Number of steps") +
+    scale_x_continuous(breaks=seq(0,288,by=12),labels = seq(0,24))
+
+```
+
+Which block of 5 minutes contains on average the most steps?
+```{r, echo=TRUE}
+groupbyTime[which.max(groupbyTime$interval_steps),"interval"]
+```
+So, between 8:35 and 8:40, on average the most steps are taken...
+
+## Imputing missing values
+
+For all the missing values, the average values of the respective interval wil be used to fill the missing value.
+
+How many missing values do we have?
+```{r}
+sum(is.na(df_activity$steps))
+```
+
+For all the missing values, the average values of the respective interval wil be used to fill the missing value.
+
+```{r, echo = TRUE}
+df_activityNOna<-merge(x=df_activity,y=groupbyTime,by="interval",all.x=TRUE)
+df_activityNOna[is.na(df_activityNOna[,"steps"]),"steps"]<-round(df_activityNOna[is.na(df_activityNOna[,"steps"]),"interval_steps"])
+df_activityNOna<-df_activityNOna[,c("steps","date","interval")]
+
+```
+
+
+The histogram for the number of steps a day now looks as follows:
+
+```{r, echo=TRUE}
+
+groupbyDateNOna <-  df_activityNOna   %>% 
+    group_by(date) %>% 
+    summarise(daily_steps=sum(steps))
+
+groupbyDateNOna$daily_steps<-unlist(groupbyDateNOna$daily_steps)
+
+ggplot()+aes(groupbyDateNOna$daily_steps) + 
+    geom_histogram(col="black", 
+                   fill="green", 
+                   alpha = .2,
+                   bins=10) + 
+    labs(title="Number of steps per day") +
+    labs(x="Number of steps", y="Number of days") +
+    geom_vline(aes(xintercept=mean(groupbyDateNOna$daily_steps)),color="red", linetype="dashed", size=1)+
+    scale_x_continuous(breaks = c(0,5000,10000,15000,20000,25000))+
+    scale_y_continuous(breaks = c(0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30))
+```
+
+### Extra Barplot
+
+because I felt that the histogram did not give the correct insight, I made a barplot which does give the picture I was looking for
+
+```{r, echo = TRUE}
+ggplot(groupbyDateNOna)+aes(x=date,y=daily_steps) + 
+    geom_bar(col="black", 
+             fill="green", 
+             alpha = .2,
+             stat="identity") + 
+    labs(title="Number of steps per day") +
+    labs(x="Days", y="Number of Steps")+
+    geom_hline(aes(yintercept=mean(groupbyDateNOna$daily_steps)),color="red", linetype="dashed", size=1)
+```
+
+If you compare this bar plot with the first bar plot it's clear that days with missing data are filled up to the mean...
+
+Because I added the average number of steps of the missing interval for filling the NA intervals. I don't expect the average and mean to be changed much
+
+
+```{r, echo = TRUE}
+mean(groupbyDateNOna$daily_steps)
+median(groupbyDateNOna$daily_steps)
+
+```
+
+I think the small change in the mean is due to thr round() I used.
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+Here we look at how the distribution of the number of steps throughout the day. 
+The day will be divided into 288 blocks of 5 minutes.
+But now we split the data into two groups: Weekdays and Weekends
+
+First we introduce a new factorvariable DayType which contains information about the day.. 
+Is it a weekday or a weekend day?
+
+```{r, echo=TRUE}
+df_activityNOna$DayType<-c("Weekend", "Weekday", "Weekday", 
+                           "Weekday", "Weekday", "Weekday", 
+                        "Weekend")[as.POSIXlt(df_activityNOna$date)$wday + 1]
+df_activityNOna$DayType<-as.factor(df_activityNOna$DayType)
+
+```
+
+Now we create Two Plots.
+One for the weekdays and one for the weekends
+
+```{r, echo=TRUE}
+
+groupbyWDTime <-  df_activityNOna  %>% 
+    group_by(interval,DayType) %>% 
+    summarise(interval_steps=mean(steps))
+
+groupbyWDTime$interval_steps<-unlist(groupbyTime$interval_steps)
+groupbyWDTime$interval_num<-as.numeric(groupbyTime$interval)
+
+ggplot(groupbyWDTime)+aes(interval_num,interval_steps) + 
+    geom_line(col="black") + 
+    labs(title="Average number of steps per 5 minute interval") +
+    labs(x="Intervals", y="Number of steps") +
+    scale_x_continuous(breaks=seq(0,288,by=12),labels = seq(0,24))+
+    facet_grid(DayType ~ . )
+
+```
+
+In my opinion there no big difference between weekdays end weekends...
